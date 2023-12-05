@@ -9,28 +9,28 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <zephyr.h>
-#include <arch/cpu.h>
-#include <sys/byteorder.h>
-#include <logging/log.h>
-#include <sys/util.h>
+#include <zephyr/kernel.h>
+#include <zephyr/arch/cpu.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 
-#include <device.h>
-#include <init.h>
-#include <drivers/uart.h>
+#include <zephyr/device.h>
+#include <zephyr/init.h>
+#include <zephyr/drivers/uart.h>
 
-#include <net/buf.h>
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/l2cap.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/buf.h>
-#include <bluetooth/hci_raw.h>
+#include <zephyr/net/buf.h>
+#include <zephyr/bluetooth/bluetooth.h>
+#include <zephyr/bluetooth/l2cap.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/bluetooth/buf.h>
+#include <zephyr/bluetooth/hci_raw.h>
 
 #include <nrfx.h>
 #include <hal/nrf_power.h>
-#include <power/reboot.h>
-#include <usb/usb_device.h>
-#include <drivers/gpio.h>
+#include <zephyr/sys/reboot.h>
+#include <zephyr/usb/usb_device.h>
+#include <zephyr/drivers/gpio.h>
 
 #include "usb_uart_bridge.h"
 
@@ -358,7 +358,7 @@ void bt_ctlr_assert_handle(char *file, uint32_t line)
 }
 #endif /* CONFIG_BT_CTLR_ASSERT_HANDLER */
 
-static int hci_uart_init(const struct device *unused)
+static int hci_uart_init(void)
 {
 	LOG_DBG("init hci uart");
 
@@ -377,8 +377,7 @@ static int hci_uart_init(const struct device *unused)
 	return 0;
 }
 
-SYS_DEVICE_DEFINE("hci_uart", hci_uart_init, NULL,
-		  APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEVICE);
+SYS_INIT(hci_uart_init, APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEVICE);
 
 #if defined(OLD_BOARD)
 void set_leds(bool red, bool green, bool blue)

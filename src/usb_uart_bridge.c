@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <zephyr.h>
-#include <device.h>
-#include <drivers/uart.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
 #include <nrfx.h>
 #include <string.h>
 #include <stdio.h>
 #include <hal/nrf_power.h>
-#include <power/reboot.h>
-#include <usb/usb_device.h>
-#include <logging/log.h>
-#include <logging/log_ctrl.h>
+#include <zephyr/sys/reboot.h>
+#include <zephyr/usb/usb_device.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
 
 #include "usb_uart_bridge.h"
 
