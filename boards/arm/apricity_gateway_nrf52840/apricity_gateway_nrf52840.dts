@@ -31,42 +31,42 @@
 	};
 
 	interface_to_nrf9160: gpio-interface {
-	       compatible = "nordic,nrf9160dk-nrf52840-interface";
-	       #gpio-cells = <2>;
-	       gpio-map-mask = <0xf 0>;
-	       gpio-map-pass-thru = <0 0xffffffff>;
-	       gpio-map = <0 0 &gpio0 11 0>,
+		compatible = "nordic,nrf9160-nrf52840-interface";
+		#gpio-cells = <2>;
+		gpio-map-mask = <0xf 0>;
+		gpio-map-pass-thru = <0 0xffffffff>;
+		gpio-map = <0 0 &gpio0 11 0>,
 			  <1 0 &gpio0 13 0>,
 			  <2 0 &gpio0 15 0>,
 			  <3 0 &gpio0 14 0>,
 			  <4 0 &gpio0 20 0>,
 			  <5 0 &gpio0 22 0>,
-			  /* 6: COEX0 */
-			  /* 7: COEX1 */
-			  /* 8: COEX2 */
+			  <6 0 &gpio1 7 0>, /* COEX0 */
+			  <7 0 &gpio1 4 0>, /* COEX1 */
+			  <8 0 &gpio1 1 0>, /* COEX2 */
 			  <9 0 &gpio1 2 0>,
 			  <10 0 &gpio0 12 0>;
 	};
 
 	nrf52840_reset: gpio-reset {
-	       compatible = "nordic,nrf9160dk-nrf52840-reset";
-	       status = "okay";
-	       /*
+		compatible = "nordic,nrf9160-nrf52840-reset";
+		status = "okay";
+		/*
 		* This line is specified as active high for compatibility
 		* with the previously used Kconfig-based configuration.
 		*/
-	       gpios = <&interface_to_nrf9160 9 GPIO_ACTIVE_HIGH>;
+		gpios = <&interface_to_nrf9160 9 GPIO_ACTIVE_HIGH>;
 	};
 
 	nrf52840_boot: gpio-boot {
-	       compatible = "nordic,nrf9160dk-nrf52840-boot";
-	       status = "okay";
-	       gpios = <&interface_to_nrf9160 10 GPIO_PULL_UP>;
+		compatible = "nordic,nrf9160-nrf52840-boot";
+		status = "okay";
+		gpios = <&interface_to_nrf9160 10 GPIO_PULL_UP>;
 	};
 
 	aliases {
 		mcuboot-button0 = &button0;
-      	};
+	};
 };
 
 &adc {
@@ -89,14 +89,14 @@
 	uart0_default_alt: uart0_default_alt {
 		group1 {
 			psels = <NRF_PSEL(UART_TX, 0, 13)>,
-			        <NRF_PSEL(UART_RX, 0, 11)>;
+				<NRF_PSEL(UART_RX, 0, 11)>;
 		};
 	};
 
 	uart0_sleep_alt: uart0_sleep_alt {
 		group1 {
 			psels = <NRF_PSEL(UART_TX, 0, 13)>,
-			        <NRF_PSEL(UART_RX, 0, 11)>;
+				<NRF_PSEL(UART_RX, 0, 11)>;
 			low-power-enable;
 		};
 	};
@@ -106,11 +106,11 @@
 			psels = <NRF_PSEL(UART_TX, 0, 20)>,
 				<NRF_PSEL(UART_RTS, 0, 24)>;
 		};
-       	group2 {
+		group2 {
 			psels = <NRF_PSEL(UART_RX, 0, 22)>,
 				<NRF_PSEL(UART_CTS, 0, 32)>;
-       		bias-pull-up;
-       	};
+			bias-pull-up;
+		};
 	};
 
 	uart1_sleep_alt: uart1_sleep_alt {
@@ -119,12 +119,12 @@
 				<NRF_PSEL(UART_RTS, 0, 24)>;
 			low-power-enable;
 		};
-       	group2 {
+		group2 {
 			psels = <NRF_PSEL(UART_RX, 0, 22)>,
 				<NRF_PSEL(UART_CTS, 0, 32)>;
-       		bias-pull-up;
+			bias-pull-up;
 			low-power-enable;
-       	};
+		};
 	};
 
 };

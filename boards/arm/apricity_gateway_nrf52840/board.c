@@ -118,10 +118,9 @@ static int init(void)
 	if (IS_ENABLED(CONFIG_BOARD_APRICITY_GATEWAY_NRF52840_RESET)) {
 		int rc;
 		const struct device *reset_port = DEVICE_DT_GET(RESET_GPIO_CTRL);
-		const struct device *boot_port = DEVICE_DT_GET(BOOT_BPIO_CTRL);
-		const char *name;
+		const struct device *boot_port = DEVICE_DT_GET(BOOT_GPIO_CTRL);
 
-		LOG_INF("Enabling GPIO reset line..",
+		LOG_INF("Enabling GPIO reset line..");
 
 		rc = reset_pin_configure(reset_port, RESET_GPIO_PIN);
 		if (rc) {

@@ -37,6 +37,6 @@ description: |
           from nRF9160 are routed to nRF52840, they are not available on the DK
           connectors.
 
-compatible: "nordic,nrf9160dk-nrf52840-interface"
+compatible: "nordic,nrf9160-nrf52840-interface"
 
 include: [gpio-nexus.yaml, base.yaml]
