@@ -67,11 +67,16 @@ static void chip_reset(const struct device *gpio,
 static void reset_pin_wait_low(const struct device *port, uint32_t pin)
 {
 	int val;
+	int i;
 
 	/* Wait until the pin is pulled low */
-	do {
+	for (i = 0; i < 3000; i++) {
 		val = gpio_pin_get_raw(port, pin);
-	} while (val > 0);
+		if (!val) {
+			break;
+		}
+		k_sleep(K_MSEC(1));
+	}
 }
 
 static int reset_pin_configure(const struct device *port, uint32_t pin)

@@ -36,7 +36,7 @@
 
 LOG_MODULE_REGISTER(lte_gateway_ble, CONFIG_LTE_GATEWAY_BLE_LOG_LEVEL);
 
-static const struct device *hci_uart_dev =
+static const struct device *const hci_uart_dev =
 	DEVICE_DT_GET(DT_CHOSEN(zephyr_bt_c2h_uart));
 static K_THREAD_STACK_DEFINE(tx_thread_stack, CONFIG_BT_HCI_TX_STACK_SIZE);
 static struct k_thread tx_thread_data;
@@ -93,6 +93,7 @@ NET_BUF_POOL_FIXED_DEFINE(cmd_tx_pool, CONFIG_BT_HCI_CMD_COUNT, CMD_BUF_SIZE,
 #define H4_ACL 0x02
 #define H4_SCO 0x03
 #define H4_EVT 0x04
+#define H4_ISO 0x05
 
 /* Receiver states. */
 #define ST_IDLE 0	/* Waiting for packet type. */
@@ -122,22 +123,40 @@ static int h4_read(const struct device *uart, uint8_t *buf, size_t len)
 
 static bool valid_type(uint8_t type)
 {
-	return (type == H4_CMD) || (type == H4_ACL);
+	return (type == H4_CMD) | (type == H4_ACL) | (type == H4_ISO);
 }
 
-/* Function assumes that type is validated and only CMD or ACL will be used. */
+/* Function expects that type is validated and only CMD, ISO or ACL will be used. */
 static uint32_t get_len(const uint8_t *hdr_buf, uint8_t type)
 {
-	return (type == BT_BUF_CMD) ?
-		((const struct bt_hci_cmd_hdr *)hdr_buf)->param_len :
-		sys_le16_to_cpu(((const struct bt_hci_acl_hdr *)hdr_buf)->len);
+	switch (type) {
+	case H4_CMD:
+		return ((const struct bt_hci_cmd_hdr *)hdr_buf)->param_len;
+	case H4_ISO:
+		return bt_iso_hdr_len(
+			sys_le16_to_cpu(((const struct bt_hci_iso_hdr *)hdr_buf)->len));
+	case H4_ACL:
+		return sys_le16_to_cpu(((const struct bt_hci_acl_hdr *)hdr_buf)->len);
+	default:
+		LOG_ERR("Invalid type: %u", type);
+		return 0;
+	}
 }
 
-/* Function assumes that type is validated and only CMD or ACL will be used. */
+/* Function expects that type is validated and only CMD, ISO or ACL will be used. */
 static int hdr_len(uint8_t type)
 {
-	return (type == H4_CMD) ?
-		sizeof(struct bt_hci_cmd_hdr) : sizeof(struct bt_hci_acl_hdr);
+	switch (type) {
+	case H4_CMD:
+		return sizeof(struct bt_hci_cmd_hdr);
+	case H4_ISO:
+		return sizeof(struct bt_hci_iso_hdr);
+	case H4_ACL:
+		return sizeof(struct bt_hci_acl_hdr);
+	default:
+		LOG_ERR("Invalid type: %u", type);
+		return 0;
+}
 }
 
 static void rx_isr(void)
