@@ -114,7 +114,7 @@ static int reset_pin_configure(const struct device *port, uint32_t pin)
 	return 0;
 }
 
-static int init(void)
+static int init(const struct device *dev)
 {
 	/* Make sure to configure the switches before initializing
 	 * the GPIO reset pin, so that we are connected to
