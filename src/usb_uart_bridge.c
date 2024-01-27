@@ -23,6 +23,116 @@
 
 LOG_MODULE_REGISTER(usb_uart_bridge, CONFIG_LTE_GATEWAY_BLE_LOG_LEVEL);
 
+void uart_interrupt_handler(const struct device *dev, void *user_data)
+{
+	struct serial_dev *sd = user_data;
+	struct serial_dev *peer_sd = (struct serial_dev *)sd->peer;
+	struct uart_data *rx;
+#if defined(LOG_CONTENTS)
+	static char rxlabel[32];
+	static char txlabel[32];
+#endif
+
+	while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
+		LOG_DBG("dev %p peer %p", dev, sd);
+		if (uart_irq_rx_ready(dev)) {
+			int data_length;
+
+			while (!sd->rx) {
+				sd->rx = k_malloc(sizeof(*sd->rx));
+				if (sd->rx) {
+					sd->rx->len = 0;
+				} else {
+					int err = oom_free(sd);
+
+					if (err) {
+						LOG_ERR("Could not free memory."
+							" Rebooting.");
+						sys_reboot(SYS_REBOOT_COLD);
+					}
+				}
+			}
+
+			data_length = uart_fifo_read(dev, &sd->rx->buffer[sd->rx->len],
+						   UART_BUF_SIZE - sd->rx->len);
+			sd->rx->len += data_length;
+
+			if (sd->rx->len > 0) {
+				if ((sd->rx->len == UART_BUF_SIZE) ||
+				   (sd->rx->buffer[sd->rx->len - 1] == '\n') ||
+				   (sd->rx->buffer[sd->rx->len - 1] == '\r') ||
+				   (sd->rx->buffer[sd->rx->len - 1] == '\0')) {
+#if defined(LOG_CONTENTS)
+					sprintf(rxlabel, "uart_fifo_rx %d", sd->num);
+					LOG_HEXDUMP_DBG(sd->rx->buffer,
+						sd->rx->len, rxlabel);
+#else
+					LOG_DBG("rx%d-%d RCVD", sd->num, sd->rx->len);
+#endif
+					k_timer_stop(&sd->timer);
+					rx = sd->rx;
+					sd->rx = NULL;
+					k_fifo_put(peer_sd->fifo, rx);
+					k_sem_give(&peer_sd->sem);
+				} else if (!k_timer_remaining_ticks(&sd->timer)) {
+					k_timer_user_data_set(&sd->timer, user_data);
+					k_timer_start(&sd->timer, K_MSEC(50),
+						      K_NO_WAIT);
+				}
+			}
+		}
+
+		if (uart_irq_tx_ready(dev)) {
+			struct uart_data *buf = k_fifo_get(sd->fifo, K_NO_WAIT);
+			uint16_t written = 0;
+
+			/* Nothing in the FIFO, nothing to send */
+			if (!buf) {
+				uart_irq_tx_disable(dev);
+				return;
+			}
+
+#if defined(LOG_CONTENTS)
+			if (buf->len) {
+				sprintf(txlabel, "uart_fifo_tx %d", sd->num);
+				LOG_HEXDUMP_DBG(buf->buffer, buf->len,
+					txlabel);
+			}
+#else
+			if (buf->len) {
+				LOG_DBG("tx%d-%d SENT", sd->num, buf->len);
+			}
+#endif
+
+			while (buf->len > written) {
+				if (uart_irq_tx_ready(dev)) {
+					written += uart_fifo_fill(dev,
+								  &buf->buffer[written],
+								  buf->len - written);
+				}
+			}
+
+			int i = 0;
+
+			while (!uart_irq_tx_complete(dev)) {
+				/* Wait for the last byte to get
+				 * shifted out of the module
+				 */
+				if (i++ > UART_IRQ_TX_EMPTY_LOOP_COUNT) {
+					LOG_ERR("timeout on tx complete");
+					break;
+				}
+			}
+
+			if (k_fifo_is_empty(sd->fifo)) {
+				uart_irq_tx_disable(dev);
+			}
+
+			k_free(buf);
+		}
+	}
+}
+
 /* Overriding weak function to set iSerial runtime. */
 uint8_t *usb_update_sn_string_descriptor(void)
 {
@@ -34,8 +144,6 @@ uint8_t *usb_update_sn_string_descriptor(void)
 
 	return (uint8_t *)&buf;
 }
-
-
 
 /* Frees data for incoming transmission on device blocked by full heap. */
 static int oom_free(struct serial_dev *sd)
@@ -84,122 +192,12 @@ void uart_timer_handler(struct k_timer *timer_id)
 	} else  {
 		LOG_DBG("timer ignored");
 	}
-
 }
 
 void uart_bridge_init(struct serial_dev *sd0, struct serial_dev *sd1)
 {
 	k_timer_init(&sd0->timer, uart_timer_handler, NULL);
 	k_timer_init(&sd1->timer, uart_timer_handler, NULL);
-}
-
-void uart_interrupt_handler(const struct device *dev, void *user_data)
-{
-	struct serial_dev *sd = user_data;
-	struct serial_dev *peer_sd = (struct serial_dev *)sd->peer;
-	struct uart_data *rx;
-#if defined(LOG_CONTENTS)
-	static char rxlabel[32];
-	static char txlabel[32];
-#endif
-
-	uart_irq_update(dev);
-
-	while (uart_irq_rx_ready(dev)) {
-		int data_length;
-
-		while (!sd->rx) {
-			sd->rx = k_malloc(sizeof(*sd->rx));
-			if (sd->rx) {
-				sd->rx->len = 0;
-			} else {
-				int err = oom_free(sd);
-
-				if (err) {
-					LOG_ERR("Could not free memory."
-						" Rebooting.");
-					sys_reboot(SYS_REBOOT_COLD);
-				}
-			}
-		}
-
-		data_length = uart_fifo_read(dev, &sd->rx->buffer[sd->rx->len],
-					   UART_BUF_SIZE - sd->rx->len);
-		sd->rx->len += data_length;
-
-		if (sd->rx->len > 0) {
-			if ((sd->rx->len == UART_BUF_SIZE) ||
-			   (sd->rx->buffer[sd->rx->len - 1] == '\n') ||
-			   (sd->rx->buffer[sd->rx->len - 1] == '\r') ||
-			   (sd->rx->buffer[sd->rx->len - 1] == '\0')) {
-#if defined(LOG_CONTENTS)
-				sprintf(rxlabel, "uart_fifo_rx %d", sd->num);
-				LOG_HEXDUMP_DBG(sd->rx->buffer,
-					sd->rx->len, rxlabel);
-#else
-				LOG_DBG("rx%d-%d RCVD", sd->num, sd->rx->len);
-#endif
-				k_timer_stop(&sd->timer);
-				rx = sd->rx;
-				sd->rx = NULL;
-				k_fifo_put(peer_sd->fifo, rx);
-				k_sem_give(&peer_sd->sem);
-			} else if (!k_timer_remaining_ticks(&sd->timer)) {
-				k_timer_user_data_set(&sd->timer, user_data);
-				k_timer_start(&sd->timer, K_MSEC(50),
-					      K_NO_WAIT);
-			}
-		}
-	}
-
-	if (uart_irq_tx_ready(dev)) {
-		struct uart_data *buf = k_fifo_get(sd->fifo, K_NO_WAIT);
-		uint16_t written = 0;
-
-		/* Nothing in the FIFO, nothing to send */
-		if (!buf) {
-			uart_irq_tx_disable(dev);
-			return;
-		}
-
-#if defined(LOG_CONTENTS)
-		if (buf->len) {
-			sprintf(txlabel, "uart_fifo_tx %d", sd->num);
-			LOG_HEXDUMP_DBG(buf->buffer, buf->len,
-				txlabel);
-		}
-#else
-		if (buf->len) {
-			LOG_DBG("tx%d-%d SENT", sd->num, buf->len);
-		}
-#endif
-
-		while (buf->len > written) {
-			if (uart_irq_tx_ready(dev)) {
-				written += uart_fifo_fill(dev,
-							  &buf->buffer[written],
-							  buf->len - written);
-			}
-		}
-
-		int i = 0;
-
-		while (!uart_irq_tx_complete(dev)) {
-			/* Wait for the last byte to get
-			 * shifted out of the module
-			 */
-			if (i++ > UART_IRQ_TX_EMPTY_LOOP_COUNT) {
-				LOG_ERR("timeout on tx complete");
-				break;
-			}
-		}
-
-		if (k_fifo_is_empty(sd->fifo)) {
-			uart_irq_tx_disable(dev);
-		}
-
-		k_free(buf);
-	}
 }
 
 void power_thread(void)

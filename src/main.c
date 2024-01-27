@@ -156,7 +156,7 @@ static int hdr_len(uint8_t type)
 	default:
 		LOG_ERR("Invalid type: %u", type);
 		return 0;
-}
+	}
 }
 
 static void rx_isr(void)
@@ -203,6 +203,7 @@ static void rx_isr(void)
 				buf = bt_buf_get_tx(BT_BUF_H4, K_NO_WAIT,
 						    &type, sizeof(type));
 				if (!buf) {
+					LOG_ERR("No available command buffers!");
 					state = ST_IDLE;
 					return;
 				}
@@ -561,14 +562,12 @@ void main(void)
 
 	uart_bridge_init(usb_0_sd, uart_0_sd);
 
-	uart_irq_callback_user_data_set(usb_0_dev, uart_interrupt_handler,
-		usb_0_sd);
-	uart_irq_callback_user_data_set(uart_0_dev, uart_interrupt_handler,
-		uart_0_sd);
+	uart_irq_callback_user_data_set(usb_0_dev, uart_interrupt_handler, usb_0_sd);
+	uart_irq_callback_user_data_set(uart_0_dev, uart_interrupt_handler, uart_0_sd);
 
 	ret = usb_enable(NULL);
 	if (ret != 0) {
-		LOG_INF("Failed to enable USB");
+		LOG_ERR("Failed to enable USB");
 		return;
 	}
 
